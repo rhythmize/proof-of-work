@@ -9,6 +9,4 @@ from proof_of_work import solve
 authdata = b'AzYRrAzFGtUesvkUOPxGGMvbOsbJCarGDNnIugELJzNTAPJEtMlgiHHFLBuYPJLk'
 
 if __name__ == '__main__':
-    while True:
-        solve(authdata)
-
+    solve(authdata)
