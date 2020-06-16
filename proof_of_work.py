@@ -4,10 +4,11 @@ proof_of_work.py
 Created on: 14-Jun-2020
     Author: rhythm
 """
-from multiprocessing import Process, current_process
 from hashlib import sha1
-from time import time
+from itertools import product
+from multiprocessing import Process, current_process
 from os import cpu_count
+from time import time
 
 unwanted_chars = [0x0a, 0x0d, 0x09, 0x20]  # hex values for ['\n', '\r', '\t', ' ']
 char_set = [x for x in range(0x00, 0x100) if x not in unwanted_chars]
@@ -19,15 +20,11 @@ def sha1_digest(string):
 
 def get_string_from_char_set(n, offset):
     """
-    Yields all strings in the char_set, sorted by length.
+    Yield strings in the char_set in increasing order of length
     """
-    m = len(char_set)
     while True:
-        for i in range(m ** n):
-            s = bytearray()
-            for j in range(n):
-                s.append(char_set[(i // (m ** j)) % m])
-            yield s
+        for p in product(char_set, repeat=n):
+            yield bytearray(p)
         n += offset
 
 
