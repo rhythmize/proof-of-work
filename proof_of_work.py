@@ -6,8 +6,7 @@ Created on: 14-Jun-2020
 """
 from hashlib import sha1
 from itertools import product
-from ctypes import c_bool
-from multiprocessing import Process, current_process, Value
+from multiprocessing import Process, Event, current_process
 from os import cpu_count
 from time import time
 
@@ -16,6 +15,7 @@ class ProofOfWork(object):
     """
     class to solve Proof of Work with SHA1 hash
     """
+
     def __init__(self, base_string, difficulty, unwanted_chars=None):
         """
         :param base_string: base string to solve POW with
@@ -26,10 +26,8 @@ class ProofOfWork(object):
         if unwanted_chars is None:
             unwanted_chars = list()
         self.char_set = [x for x in range(0x00, 0x100) if x not in unwanted_chars]
-        self.solved = Value(c_bool, False)
-        self.start_time = time()
-        self.total_cpus = cpu_count()
 
+        self.total_cpus = cpu_count()
         """
         independent string_generators to be used in different processes
         Generator 1: Generate strings of length 0, 8, 16, ...
@@ -46,6 +44,11 @@ class ProofOfWork(object):
         for index in range(self.total_cpus):
             self.process_list.append(
                 Process(target=self._worker, args=(base_string, self.string_generators[index], difficulty)))
+
+        # Use multiprocessing Event to signal that hash has been found,
+        # multiprocessing Value slows down the worker due to shared memory
+        self.solved = Event()
+        self.start_time = time()
 
     def _sha1_digest(self, string):
         return sha1(string).hexdigest()
@@ -68,9 +71,9 @@ class ProofOfWork(object):
         :param difficulty: difficulty level to solve the base_string for
         :return:
         """
-        while not self.solved.value:
-            s = next(string_generator)
-            hex_digest = self._sha1_digest(base_string + s)
+        while True:
+            suffix = next(string_generator)
+            hex_digest = self._sha1_digest(base_string + suffix)
             # count = 0
             # while hex_digest[count] == '0':
             #     count += 1
@@ -78,8 +81,9 @@ class ProofOfWork(object):
             #     print("%s: Length: %s, Zeros: %s, Time: %s mins, String: %s, Hash: %s..." %
             #           (current_process().name, len(s), count, (time() - self.start_time) / 60, s, hex_digest[:10]))
             if hex_digest.startswith('0' * difficulty):
-                self.solved.value = True
-                print("Solved with %s. Hash: %s" % (s, hex_digest[:10]))
+                print("%s: Time: %s mins, String: %s, Hash: %s..." %
+                      (current_process().name, (time() - self.start_time) / 60, suffix, hex_digest[:10]))
+                self.solved.set()
                 break
 
     def solve(self):
@@ -90,6 +94,11 @@ class ProofOfWork(object):
         for p in self.process_list:
             p.start()
 
+        # wait for solved event to be set by any worker thread.
+        self.solved.wait()
+
+        # Terminate and join all processes
         for p in self.process_list:
+            p.terminate()
             p.join()
         print("Joined in", (time() - start_time) / 60, "mins")
