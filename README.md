@@ -1,4 +1,4 @@
-##Proof of Work using SHA1
+## Proof of Work using SHA1
 
 Solving Proof Of Work with SHA1
 
