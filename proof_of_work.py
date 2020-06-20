@@ -6,7 +6,7 @@ Created on: 14-Jun-2020
 """
 from hashlib import sha1
 from itertools import product
-from multiprocessing import Process, Event, current_process
+from multiprocessing import Process, Event, current_process, Manager
 from os import cpu_count
 from time import time
 
@@ -25,6 +25,13 @@ class ProofOfWork(object):
         """
         if unwanted_chars is None:
             unwanted_chars = list()
+
+        # Use multiprocessing Event to signal that hash has been found,
+        # multiprocessing Value slows down the worker due to shared memory
+        self.solved = Event()
+        # Use multiprocessing Manager List to send the result suffix string back to calling process
+        self.result = Manager().list()
+
         self.char_set = [x for x in range(0x00, 0x100) if x not in unwanted_chars]
 
         self.total_cpus = cpu_count()
@@ -45,9 +52,6 @@ class ProofOfWork(object):
             self.process_list.append(
                 Process(target=self._worker, args=(base_string, self.string_generators[index], difficulty)))
 
-        # Use multiprocessing Event to signal that hash has been found,
-        # multiprocessing Value slows down the worker due to shared memory
-        self.solved = Event()
         self.start_time = time()
 
     def _sha1_digest(self, string):
@@ -74,15 +78,12 @@ class ProofOfWork(object):
         while True:
             suffix = next(string_generator)
             hex_digest = self._sha1_digest(base_string + suffix)
-            # count = 0
-            # while hex_digest[count] == '0':
-            #     count += 1
-            # if count > 5:
-            #     print("%s: Length: %s, Zeros: %s, Time: %s mins, String: %s, Hash: %s..." %
-            #           (current_process().name, len(s), count, (time() - self.start_time) / 60, s, hex_digest[:10]))
             if hex_digest.startswith('0' * difficulty):
                 print("%s: Time: %s mins, String: %s, Hash: %s..." %
                       (current_process().name, (time() - self.start_time) / 60, suffix, hex_digest[:10]))
+                # only add the first found results in case two different threads solve at same time
+                if len(self.result) == 0:
+                    self.result.extend(suffix)
                 self.solved.set()
                 break
 
@@ -102,3 +103,4 @@ class ProofOfWork(object):
             p.terminate()
             p.join()
         print("Joined in", (time() - start_time) / 60, "mins")
+        return bytearray(self.result)
