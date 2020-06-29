@@ -2,12 +2,9 @@
 
 Solving Proof Of Work with SHA1
 
+Test strings are available in main.py for dry runs
+
 Usage:
 ```
-    from proof_of_work import solve
-    
-    base_string = 'TestString'
-    
-    while True:
-        solve(base_string)
+    python test.py
 ```
